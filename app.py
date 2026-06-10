@@ -6,7 +6,7 @@ import os
 import traceback
 import pandas as pd
 
-from Pipeline.stat_builder import run_pipeline, find_sas_folder
+from pipeline.stat_builder import run_pipeline, find_sas_folder
 
 st.set_page_config(
     page_title="Schema vs Raw Comparator",
