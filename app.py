@@ -48,7 +48,21 @@ if st.button("Run"):
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(tmpdir)
 
+            # ✅ debug
+            st.write("Extracted files:", os.listdir(tmpdir))
+
+            # ✅ 自動找真正 SAS folder（你剛剛寫的 function）
+            from pipeline.stat_builder import find_sas_folder
+
+            cube_path = find_sas_folder(tmpdir)
+
+            st.write("Final cube path:", cube_path)
+            st.write("Files in folder:", os.listdir(cube_path))
+
+
             cube_path = tmpdir
+
+    
 
     if not cube_path:
         st.error("No data path")
