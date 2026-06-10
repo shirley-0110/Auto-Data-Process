@@ -2,6 +2,18 @@
 import pandas as pd
 import os
 
+
+
+def find_sas_folder(base):
+    """
+    自動找到真正放 .sas7bdat 的資料夾
+    """
+    for root, dirs, files in os.walk(base):
+        if any(f.endswith(".sas7bdat") for f in files):
+            return root
+    return base
+
+
 def load_cube(path):
     datasets = {}
 
@@ -31,6 +43,7 @@ def map_visit(fmt):
 
 def run_pipeline(cube_path, schema_path):
 
+    cube_path = find_sas_folder(cube_path)
     data = load_cube(cube_path)
 
     outputs = {}
