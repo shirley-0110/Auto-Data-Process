@@ -3,10 +3,11 @@ import streamlit as st
 import tempfile
 import zipfile
 import os
+import traceback
 
 from pipeline.stat_builder import run_pipeline, find_sas_folder
 
-st.title("Auto Data Processor")
+st.title("Schema vs Raw Comparator")
 
 # Upload schema
 schema_file = st.file_uploader("Upload eCRF Schema", type=["xlsx"])
@@ -25,88 +26,78 @@ elif mode == "Upload ZIP":
     uploaded_zip = st.file_uploader("Upload CRScube ZIP", type=["zip"])
 
 
-# Run
 if st.button("Run"):
-
     if not schema_file:
         st.error("Please upload schema")
         st.stop()
 
+    # 先存 schema
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         tmp.write(schema_file.read())
         schema_path = tmp.name
 
-    if mode == "Upload ZIP":
+    try:
+        if mode == "Upload ZIP":
+            if not uploaded_zip:
+                st.error("Please upload ZIP")
+                st.stop()
 
-        if not uploaded_zip:
-            st.error("Please upload ZIP")
-            st.stop()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                zip_path = os.path.join(tmpdir, "data.zip")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+                with open(zip_path, "wb") as f:
+                    f.write(uploaded_zip.read())
 
-            zip_path = os.path.join(tmpdir, "data.zip")
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(tmpdir)
 
-            with open(zip_path, "wb") as f:
-                f.write(uploaded_zip.read())
+                st.write("Extracted files:")
+                st.write(os.listdir(tmpdir))
 
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                zip_ref.extractall(tmpdir)
+                cube_path = find_sas_folder(tmpdir)
 
-            st.write("Extracted:", os.listdir(tmpdir))
+                st.write(f"Final cube path: {cube_path}")
+                st.write("Files in folder:")
+                st.write(os.listdir(cube_path))
 
-            cube_path = find_sas_folder(tmpdir)
-
-            st.write("Final path:", cube_path)
-            st.write("Files:", os.listdir(cube_path))
-
-            with st.spinner("Processing..."):
-                
-                try:
+                with st.spinner("Processing..."):
                     schema_df, raw_df, compare_df = run_pipeline(
                         cube_path=cube_path,
                         schema_path=schema_path
                     )
 
-                except Exception as e:
-                    st.error("Error occurred:")
-                    st.write(str(e))
-                    import traceback
-                    st.text(traceback.format_exc())
-                    st.stop()
+        else:
+            if not cube_path:
+                st.error("Please enter cube path")
+                st.stop()
 
-
-    else:
-        with st.spinner("Processing..."):
-            try:
+            with st.spinner("Processing..."):
                 schema_df, raw_df, compare_df = run_pipeline(
                     cube_path=cube_path,
                     schema_path=schema_path
                 )
 
-            except Exception as e:
-                st.error("Error occurred:")
-                st.write(str(e))
-                import traceback
-                st.text(traceback.format_exc())
-                st.stop()
+        st.success("Done ✅")
 
-    st.success("Done ✅")
+        st.subheader("Schema List")
+        st.dataframe(schema_df, use_container_width=True)
 
-    # ====================================================
-    # 顯示結果
-    # ====================================================
-    st.subheader("Schema List")
-    st.dataframe(schema_df)
+        st.subheader("Raw List")
+        st.dataframe(raw_df, use_container_width=True)
 
-    st.subheader("Raw List")
-    st.dataframe(raw_df)
+        st.subheader("Comparison Result")
+        st.dataframe(compare_df, use_container_width=True)
 
-    st.subheader("Comparison Result")
-    st.dataframe(compare_df)
+        st.download_button(
+            "Download Comparison CSV",
+            compare_df.to_csv(index=False).encode("utf-8-sig"),
+            "compare_result.csv",
+            mime="text/csv"
+        )
 
-    # Download
-    st.download_button(
-        "Download Comparison CSV",
-        compare_df.to_csv(index=False),
-        "compare_result.csv"
-    )
+    except Exception as e:
+        st.error("Error occurred:")
+        st.write(str(e))
+        st.text(traceback.format_exc())
+        st.stop()
+
