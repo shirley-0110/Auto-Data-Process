@@ -101,9 +101,9 @@ if st.button("Run"):
     st.session_state["raw"] = raw_df
     st.session_state["compare"] = compare_df
 
-    except Exception as e:
-        st.error("Error")
-        st.text(traceback.format_exc())
+except Exception as e:
+    st.error("Error")
+    st.text(traceback.format_exc())
 
 
 # =========================================================
