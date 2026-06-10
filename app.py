@@ -16,7 +16,7 @@ st.set_page_config(
 st.title("📊 CRF Schema vs Raw Data")
 
 schema_file = st.file_uploader("Upload eCRF Schema", type=["xlsx"])
-uploaded_zip = st.file_uploader("Upload CRScube ZIP", type=["zip"])
+uploaded_zip = st.file_uploader("Upload Dataset ZIP", type=["zip"])
 
 if st.button("Run"):
 
