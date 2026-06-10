@@ -4,6 +4,7 @@ import zipfile
 import os
 import traceback
 import pandas as pd
+import json
 
 from pipeline.stat_builder import run_pipeline, find_sas_folder
 
@@ -17,11 +18,11 @@ st.title("📊 CRF Schema vs Raw Data")
 
 
 # =========================================================
-# Helper Functions
+# Helper functions
 # =========================================================
 def style_compare(df: pd.DataFrame):
     """
-    Compare table 高亮顯示
+    根據 STATUS 高亮 compare table
     """
     def highlight_row(row):
         status = str(row.get("STATUS", "")).upper()
@@ -72,6 +73,7 @@ def apply_filters(compare_df: pd.DataFrame,
 
 def render_summary(compare_df: pd.DataFrame):
     total = len(compare_df)
+
     match_cnt = int((compare_df["STATUS"] == "MATCH").sum()) if "STATUS" in compare_df.columns else 0
     mismatch_cnt = int((compare_df["STATUS"] == "DATATYPE_MISMATCH").sum()) if "STATUS" in compare_df.columns else 0
     missing_cnt = int((compare_df["STATUS"] == "MISSING_IN_RAW").sum()) if "STATUS" in compare_df.columns else 0
@@ -96,19 +98,34 @@ def get_review_record(compare_df, selected_dataset, selected_variable):
 
 
 def get_schema_detail(schema_df, selected_dataset, selected_variable):
-    df = schema_df[
+    return schema_df[
         (schema_df["DATASET"] == selected_dataset) &
         (schema_df["VARIABLE"] == selected_variable)
     ]
-    return df
 
 
 def get_raw_detail(raw_df, selected_dataset, selected_variable):
-    df = raw_df[
+    return raw_df[
         (raw_df["DATASET"] == selected_dataset) &
         (raw_df["VARIABLE"] == selected_variable)
     ]
-    return df
+
+
+def parse_raw_sample(raw_sample_value):
+    """
+    RAW_SAMPLE 在 stat_builder.py 是 json.dumps(list) 存成字串
+    這裡把它轉回 list
+    """
+    if pd.isna(raw_sample_value):
+        return []
+
+    if isinstance(raw_sample_value, list):
+        return raw_sample_value
+
+    try:
+        return json.loads(raw_sample_value)
+    except Exception:
+        return [str(raw_sample_value)]
 
 
 # =========================================================
@@ -195,7 +212,7 @@ if "compare_df" in st.session_state:
     dataset_options = sorted(compare_df["DATASET"].dropna().astype(str).unique().tolist()) if "DATASET" in compare_df.columns else []
     status_options = sorted(compare_df["STATUS"].dropna().astype(str).unique().tolist()) if "STATUS" in compare_df.columns else []
 
-    # for table filter
+    # Table mode filters
     dataset_filter = st.sidebar.multiselect(
         "Dataset Filter",
         options=dataset_options
@@ -218,7 +235,7 @@ if "compare_df" in st.session_state:
         only_issues=only_issues
     )
 
-    # Review selector
+    # Review selectors
     st.sidebar.divider()
 
     review_dataset = st.sidebar.selectbox(
@@ -268,14 +285,15 @@ if "compare_df" in st.session_state:
 
             c1, c2, c3 = st.columns(3)
 
+            # -------------------------
             # Schema panel
+            # -------------------------
             with c1:
                 st.markdown("#### 📄 Schema")
 
                 if schema_detail.empty:
                     st.warning("No schema definition found")
                 else:
-                    # 顯示第一筆 detail
                     row = schema_detail.iloc[0]
                     st.write("**Variable**:", row.get("VARIABLE"))
                     st.write("**Label**:", row.get("LABEL"))
@@ -285,9 +303,11 @@ if "compare_df" in st.session_state:
                     with st.expander("Show Schema Rows"):
                         st.dataframe(schema_detail, use_container_width=True)
 
+            # -------------------------
             # Raw panel
+            # -------------------------
             with c2:
-                st.markdown("#### 📦 Raw")
+                st.markdown("#### 📦 Raw Data")
 
                 if raw_detail.empty:
                     st.warning("No raw variable found")
@@ -297,10 +317,20 @@ if "compare_df" in st.session_state:
                     st.write("**Raw Datatype**:", row.get("RAW_DATATYPE"))
                     st.write("**Raw Datatype Std**:", row.get("RAW_DATATYPE_STD"))
 
+                    st.write("**Sample Values**:")
+                    sample_values = parse_raw_sample(row.get("RAW_SAMPLE"))
+
+                    if sample_values:
+                        st.code("\n".join(sample_values))
+                    else:
+                        st.write("No sample available")
+
                     with st.expander("Show Raw Rows"):
                         st.dataframe(raw_detail, use_container_width=True)
 
+            # -------------------------
             # Compare panel
+            # -------------------------
             with c3:
                 st.markdown("#### ⚠️ Comparison")
 
@@ -309,9 +339,9 @@ if "compare_df" in st.session_state:
                 else:
                     status = str(record.get("STATUS", ""))
 
-                    st.write("**Status**:", status)
                     st.write("**Dataset**:", record.get("DATASET"))
                     st.write("**Variable**:", record.get("VARIABLE"))
+                    st.write("**Status**:", status)
 
                     if status == "MATCH":
                         st.success("MATCH")
@@ -321,6 +351,8 @@ if "compare_df" in st.session_state:
                         st.warning("MISSING_IN_RAW")
                     elif status == "EXTRA_IN_RAW":
                         st.info("EXTRA_IN_RAW")
+                    else:
+                        st.write(status)
 
                     with st.expander("Show Compare Record"):
                         st.dataframe(pd.DataFrame([record]), use_container_width=True)
@@ -337,14 +369,14 @@ if "compare_df" in st.session_state:
 
         styled_df = style_compare(filtered_compare)
 
-        # 有些環境 st.dataframe 對 styler 顯示不穩，
-        # 如果顏色沒出來可改 st.write(styled_df)
+        # 如果你的 Streamlit 版本對 Styler 支援不好，
+        # 可以改成 st.write(styled_df)
         st.dataframe(styled_df, use_container_width=True)
 
     st.divider()
 
     # -----------------------------
-    # Raw / schema / compare tabs
+    # Detail tabs
     # -----------------------------
     tab1, tab2, tab3 = st.tabs(["Schema List", "Raw List", "Comparison Table"])
 
@@ -368,7 +400,9 @@ if "compare_df" in st.session_state:
 
     with tab3:
         st.dataframe(compare_df, use_container_width=True)
+
         d1, d2 = st.columns(2)
+
         with d1:
             st.download_button(
                 "Download Filtered Compare CSV",
@@ -376,6 +410,7 @@ if "compare_df" in st.session_state:
                 "compare_filtered.csv",
                 mime="text/csv"
             )
+
         with d2:
             st.download_button(
                 "Download Full Compare CSV",
