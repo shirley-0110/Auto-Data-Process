@@ -4,8 +4,6 @@ import tempfile
 import zipfile
 import os
 
-from pipeline.stat_builder import run_pipeline
-
 st.title("Auto SDTM Data Processor")
 
 # Step 1
