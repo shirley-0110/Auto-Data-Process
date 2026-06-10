@@ -59,21 +59,18 @@ if st.button("Run"):
             st.write("Final cube path:", cube_path)
             st.write("Files in folder:", os.listdir(cube_path))
 
-
             cube_path = tmpdir
-
-    
+            
+            outputs, qc = run_pipeline(
+                cube_path=cube_path,
+                schema_path=schema_path
+            )
 
     if not cube_path:
         st.error("No data path")
         st.stop()
 
     st.info("Processing...")
-
-    outputs, qc = run_pipeline(
-        cube_path=cube_path,
-        schema_path=schema_path
-    )
 
     st.success("Done ✅")
 
