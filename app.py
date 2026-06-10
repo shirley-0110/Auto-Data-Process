@@ -72,38 +72,40 @@ if st.button("Run"):
         st.error("Please upload both schema and zip")
         st.stop()
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    try:
 
-        # save schema
-        schema_path = os.path.join(tmpdir, "schema.xlsx")
-        with open(schema_path, "wb") as f:
-            f.write(schema_file.read())
+        with tempfile.TemporaryDirectory() as tmpdir:
 
-        # save zip
-        zip_path = os.path.join(tmpdir, "data.zip")
-        with open(zip_path, "wb") as f:
-            f.write(zip_file.read())
+            # save schema
+            schema_path = os.path.join(tmpdir, "schema.xlsx")
+            with open(schema_path, "wb") as f:
+                f.write(schema_file.read())
 
-        # unzip
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(tmpdir)
+            # save zip
+            zip_path = os.path.join(tmpdir, "data.zip")
+            with open(zip_path, "wb") as f:
+                f.write(zip_file.read())
 
-        cube_path = find_sas_folder(tmpdir)
+            # unzip
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(tmpdir)
 
-        schema_df, raw_df, compare_df = run_pipeline(
-            cube_path=cube_path,
-            schema_path=schema_path
-        )
+            cube_path = find_sas_folder(tmpdir)
 
-    st.success("Done ✅")
+            schema_df, raw_df, compare_df = run_pipeline(
+                cube_path=cube_path,
+                schema_path=schema_path
+            )
 
-    st.session_state["schema"] = schema_df
-    st.session_state["raw"] = raw_df
-    st.session_state["compare"] = compare_df
+        st.success("Done ✅")
 
-except Exception as e:
-    st.error("Error")
-    st.text(traceback.format_exc())
+        st.session_state["schema"] = schema_df
+        st.session_state["raw"] = raw_df
+        st.session_state["compare"] = compare_df
+
+    except Exception as e:
+        st.error("Error")
+        st.text(traceback.format_exc())
 
 
 # =========================================================
