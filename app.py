@@ -7,6 +7,9 @@ import traceback
 
 from pipeline.stat_builder import run_pipeline, find_sas_folder
 
+
+st.set_page_config(page_title="Auto Data Process", layout="wide")
+
 st.title("Schema vs Raw Comparator")
 
 # Upload schema
