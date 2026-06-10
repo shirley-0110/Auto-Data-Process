@@ -71,29 +71,61 @@ def build_raw_list(cube_path):
 # =========================================================
 def build_schema_list(schema_path):
 
-    # 👉 假設每個sheet = dataset
     xls = pd.ExcelFile(schema_path)
-
     records = []
 
     for sheet in xls.sheet_names:
 
         df = pd.read_excel(xls, sheet_name=sheet)
 
-        for col in df.columns:
+        # 找欄位名稱（避免大小寫/空白差異）
+        df.columns = [str(c).strip() for c in df.columns]
 
-            # 你可以再改成讀 specific 欄位（之後升級）
-            datatype = "TEXT"  # 先簡化（因為你現在 schema 未結構化）
+        # 找到關鍵欄位
+        field_oid_col = None
+        field_name_col = None
+        datatype_col = None
+
+        for col in df.columns:
+            col_lower = col.lower()
+
+            if "field oid" in col_lower:
+                field_oid_col = col
+            elif "field name" in col_lower:
+                field_name_col = col
+            elif "field type" in col_lower or "data format" in col_lower:
+                datatype_col = col
+
+        # 沒有 variable row → skip
+        if not field_name_col:
+            continue
+
+        for _, row in df.iterrows():
+
+            variable = None
+
+            # ✅ 優先用 OID
+            if field_oid_col and pd.notna(row[field_oid_col]):
+                variable = str(row[field_oid_col]).strip()
+            elif pd.notna(row[field_name_col]):
+                variable = str(row[field_name_col]).strip()
+            else:
+                continue
+
+            # dtype
+            dtype = str(row[datatype_col]) if datatype_col and pd.notna(row[datatype_col]) else "UNKNOWN"
 
             records.append({
                 "SOURCE": "SCHEMA",
                 "DATASET": sheet.upper(),
-                "VARIABLE": str(col).upper(),
-                "SCHEMA_DATATYPE": datatype,
-                "SCHEMA_DATATYPE_STD": datatype
+                "VARIABLE": variable.upper(),
+                "LABEL": str(row[field_name_col]).strip() if field_name_col else None,
+                "SCHEMA_DATATYPE": dtype,
+                "SCHEMA_DATATYPE_STD": normalize_schema_dtype(dtype)
             })
 
     return pd.DataFrame(records)
+
 
 
 # =========================================================
