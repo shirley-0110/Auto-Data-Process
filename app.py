@@ -60,19 +60,35 @@ if st.button("Run"):
             st.write("Files:", os.listdir(cube_path))
 
             with st.spinner("Processing..."):
+                
+                try:
+                    schema_df, raw_df, compare_df = run_pipeline(
+                        cube_path=cube_path,
+                        schema_path=schema_path
+                    )
 
+                except Exception as e:
+                    st.error("Error occurred:")
+                    st.write(str(e))
+                    import traceback
+                    st.text(traceback.format_exc())
+                    st.stop()
+
+
+    else:
+        with st.spinner("Processing..."):
+            try:
                 schema_df, raw_df, compare_df = run_pipeline(
                     cube_path=cube_path,
                     schema_path=schema_path
                 )
 
-    else:
-        with st.spinner("Processing..."):
-
-            schema_df, raw_df, compare_df = run_pipeline(
-                cube_path=cube_path,
-                schema_path=schema_path
-            )
+            except Exception as e:
+                st.error("Error occurred:")
+                st.write(str(e))
+                import traceback
+                st.text(traceback.format_exc())
+                st.stop()
 
     st.success("Done ✅")
 
